@@ -19,7 +19,7 @@ class WebServerService : Service() {
     companion object {
         var isRunning: Boolean = false
         var activeHost: String? = null
-        const val CHANNEL_ID = "filebridge_channel"
+        const val CHANNEL_ID = "flishly_channel"
         const val NOTIF_ID = 1
         const val EXTRA_HOST = "bind_host"
     }
@@ -29,12 +29,10 @@ class WebServerService : Service() {
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification())
 
-        // A partial wake lock keeps the CPU available while the screen is off.
-        // The foreground notification remains the primary lifecycle mechanism.
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "FileBridge::ServerWakeLock"
+            "Flishly::ServerWakeLock"
         ).apply {
             setReferenceCounted(false)
             acquire()
@@ -104,7 +102,7 @@ class WebServerService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "FileBridge Server", NotificationManager.IMPORTANCE_LOW
+                CHANNEL_ID, "Flishly Server", NotificationManager.IMPORTANCE_LOW
             )
             getSystemService(NotificationManager::class.java)
                 .createNotificationChannel(channel)
@@ -114,7 +112,7 @@ class WebServerService : Service() {
     private fun buildNotification(): Notification {
         val hostText = activeHost ?: "all network interfaces"
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("FileBridge is running")
+            .setContentTitle("Flishly is running")
             .setContentText("Serving on $hostText:${ServerConfig.PORT}")
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setOngoing(true)
