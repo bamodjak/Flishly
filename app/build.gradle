@@ -21,8 +21,6 @@ android {
         }
     }
 
-    // Target/compile against 29 but we keep requestLegacyExternalStorage so
-    // the app gets broad filesystem access without needing SAF tree grants.
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
