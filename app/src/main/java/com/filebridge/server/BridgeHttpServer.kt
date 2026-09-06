@@ -11,14 +11,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.RandomAccessFile
 
-class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port) {
+class BridgeHttpServer(
+    private val context: Context,
+    host: String?,
+    port: Int
+) : NanoHTTPD(host, port) {
 
     private val rootDir: File = Environment.getExternalStorageDirectory()
-
-    // ---- auth -------------------------------------------------------------
 
     private fun isAuthorized(session: IHTTPSession): Boolean {
         val pass = ServerConfig.password
@@ -39,8 +40,6 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         r.addHeader("WWW-Authenticate", "Basic realm=\"FileBridge\"")
         return r
     }
-
-    // ---- path safety --------------------------------------------------------
 
     private fun resolvePath(raw: String?): File {
         val clean = (raw ?: "/").let { if (it.isEmpty()) "/" else it }
@@ -80,13 +79,8 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         }
     }
 
-    // ---- main dispatch ------------------------------------------------------
-
     override fun serve(session: IHTTPSession): Response {
         val uri = session.uri
-
-        // static assets (no auth needed for the shell itself so the login
-        // prompt can render; API calls below are protected)
         if (uri == "/" || uri == "/index.html") return serveAsset("web/index.html", "text/html")
         if (uri == "/app.js") return serveAsset("web/app.js", "application/javascript")
         if (uri == "/styles.css") return serveAsset("web/styles.css", "text/css")
@@ -132,11 +126,8 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
     private fun bodyAsJson(session: IHTTPSession): JSONObject {
         val files = HashMap<String, String>()
         session.parseBody(files)
-        val postData = files["postData"] ?: "{}"
-        return JSONObject(postData)
+        return JSONObject(files["postData"] ?: "{}")
     }
-
-    // ---- handlers -----------------------------------------------------------
 
     private fun handleInfo(): Response {
         val o = JSONObject()
@@ -187,11 +178,9 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         val path = session.parameters["path"]?.firstOrNull() ?: return errorJson(Response.Status.BAD_REQUEST, "path required")
         val target = resolvePath(path)
         if (!target.exists() || target.isDirectory) return errorJson(Response.Status.NOT_FOUND, "File not found")
-
         val rangeHeader = session.headers["range"]
         val length = target.length()
         val mime = mimeFor(target.name)
-
         if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
             val parts = rangeHeader.substring(6).split("-")
             val start = parts[0].toLongOrNull() ?: 0
@@ -206,7 +195,6 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
             r.addHeader("Content-Disposition", "inline; filename=\"${target.name}\"")
             return r
         }
-
         val stream = FileInputStream(target)
         val r = newFixedLengthResponse(Response.Status.OK, mime, stream, length)
         r.addHeader("Content-Disposition", "attachment; filename=\"${target.name}\"")
@@ -219,18 +207,12 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         val target = resolvePath(path)
         if (!target.exists() || target.isDirectory) return errorJson(Response.Status.NOT_FOUND, "File not found")
         if (target.length() > 2_000_000) return errorJson(Response.Status.BAD_REQUEST, "File too large to view as text")
-        val content = target.readText()
-        val o = JSONObject()
-        o.put("content", content)
-        return json(o)
+        return json(JSONObject().put("content", target.readText()))
     }
 
     private fun handleWriteText(session: IHTTPSession): Response {
         val body = bodyAsJson(session)
-        val path = body.getString("path")
-        val content = body.optString("content", "")
-        val target = resolvePath(path)
-        target.writeText(content)
+        resolvePath(body.getString("path")).writeText(body.optString("content", ""))
         return json(JSONObject().put("ok", true))
     }
 
@@ -238,48 +220,31 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         val dirPath = session.parameters["path"]?.firstOrNull() ?: "/"
         val targetDir = resolvePath(dirPath)
         if (!targetDir.exists()) targetDir.mkdirs()
-
         val files = HashMap<String, String>()
         session.parseBody(files)
-
         val uploadedNames = JSONArray()
-        // NanoHTTPD stores the temp file location keyed by form field name,
-        // and the original client-supplied filename in the parameters map.
         for ((fieldName, tmpPath) in files) {
             val originalName = session.parameters[fieldName]?.firstOrNull() ?: File(tmpPath).name
             val safeName = File(originalName).name
-            val dest = File(targetDir, safeName)
-            File(tmpPath).copyTo(dest, overwrite = true)
+            File(tmpPath).copyTo(File(targetDir, safeName), overwrite = true)
             uploadedNames.put(safeName)
         }
-        val o = JSONObject()
-        o.put("ok", true)
-        o.put("uploaded", uploadedNames)
-        return json(o)
+        return json(JSONObject().put("ok", true).put("uploaded", uploadedNames))
     }
 
     private fun handleMkdir(session: IHTTPSession): Response {
-        val body = bodyAsJson(session)
-        val path = body.getString("path")
-        val target = resolvePath(path)
-        val ok = target.exists() || target.mkdirs()
-        return json(JSONObject().put("ok", ok))
+        val target = resolvePath(bodyAsJson(session).getString("path"))
+        return json(JSONObject().put("ok", target.exists() || target.mkdirs()))
     }
 
     private fun deleteRecursively(f: File) {
-        if (f.isDirectory) {
-            f.listFiles()?.forEach { deleteRecursively(it) }
-        }
+        if (f.isDirectory) f.listFiles()?.forEach { deleteRecursively(it) }
         f.delete()
     }
 
     private fun handleDelete(session: IHTTPSession): Response {
-        val body = bodyAsJson(session)
-        val paths = body.getJSONArray("paths")
-        for (i in 0 until paths.length()) {
-            val target = resolvePath(paths.getString(i))
-            deleteRecursively(target)
-        }
+        val paths = bodyAsJson(session).getJSONArray("paths")
+        for (i in 0 until paths.length()) deleteRecursively(resolvePath(paths.getString(i)))
         return json(JSONObject().put("ok", true))
     }
 
@@ -288,9 +253,7 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
         val src = resolvePath(body.getString("src"))
         val dst = resolvePath(body.getString("dst"))
         dst.parentFile?.mkdirs()
-        val ok = src.renameTo(dst)
-        if (!ok) {
-            // fallback: copy + delete (cross-volume)
+        if (!src.renameTo(dst)) {
             src.copyTo(dst, overwrite = true)
             deleteRecursively(src)
         }
@@ -300,23 +263,18 @@ class BridgeHttpServer(private val context: Context, port: Int) : NanoHTTPD(port
     private fun handleRename(session: IHTTPSession): Response {
         val body = bodyAsJson(session)
         val src = resolvePath(body.getString("path"))
-        val newName = body.getString("newName")
-        val dst = File(src.parentFile, newName)
-        val ok = src.renameTo(dst)
-        return json(JSONObject().put("ok", ok))
+        val dst = File(src.parentFile, File(body.getString("newName")).name)
+        return json(JSONObject().put("ok", src.renameTo(dst)))
     }
 
     private fun handleClipboardGet(): Response {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = if (cm.hasPrimaryClip() && cm.primaryClip!!.itemCount > 0) {
-            cm.primaryClip!!.getItemAt(0).coerceToText(context).toString()
-        } else ""
+        val text = if (cm.hasPrimaryClip() && cm.primaryClip!!.itemCount > 0) cm.primaryClip!!.getItemAt(0).coerceToText(context).toString() else ""
         return json(JSONObject().put("content", text))
     }
 
     private fun handleClipboardSet(session: IHTTPSession): Response {
-        val body = bodyAsJson(session)
-        val text = body.optString("content", "")
+        val text = bodyAsJson(session).optString("content", "")
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("FileBridge", text))
         return json(JSONObject().put("ok", true))
