@@ -1,0 +1,231 @@
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --card2: #253449;
+  --accent: #22d3ee;
+  --accent2: #818cf8;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --danger: #f87171;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: linear-gradient(180deg, var(--bg), #0b1220);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+#app { max-width: 1100px; margin: 0 auto; padding: 20px; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.brand {
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent);
+}
+.deviceInfo { color: var(--muted); font-size: 13px; }
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.breadcrumbs { font-size: 14px; color: var(--muted); flex: 1; min-width: 200px; word-break: break-all; }
+.breadcrumbs span { cursor: pointer; color: var(--accent); }
+.breadcrumbs span:hover { text-decoration: underline; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  background: var(--card2);
+  border: 1px solid #334155;
+  color: var(--text);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .15s;
+}
+.btn:hover { background: #334155; border-color: var(--accent); }
+
+.dropzone { position: relative; border-radius: var(--radius); overflow: hidden; }
+
+.fileTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.fileTable th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid #334155;
+}
+.fileTable td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #26344a;
+  font-size: 14px;
+}
+.fileTable tr:hover { background: var(--card2); }
+.fileTable tr:last-child td { border-bottom: none; }
+.fileRow { cursor: pointer; }
+.fileName { display: flex; align-items: center; gap: 10px; }
+.fileIcon { font-size: 18px; width: 22px; text-align: center; }
+.muted { color: var(--muted); font-size: 13px; }
+.rowMenuBtn {
+  background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px;
+  padding: 4px 8px; border-radius: 6px;
+}
+.rowMenuBtn:hover { background: #334155; color: var(--text); }
+
+.emptyState { text-align: center; padding: 60px 0; color: var(--muted); background: var(--card); }
+
+.dropOverlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(34,211,238,0.15);
+  border: 3px dashed var(--accent);
+  align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700; color: var(--accent);
+  z-index: 50;
+}
+.dropOverlay.active { display: flex; }
+
+.contextMenu {
+  position: fixed;
+  background: var(--card2);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  min-width: 160px;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.contextMenu.open { display: flex; }
+.contextMenu button {
+  background: none; border: none; color: var(--text); text-align: left;
+  padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 14px;
+}
+.contextMenu button:hover { background: #334155; }
+.contextMenu button.danger { color: var(--danger); }
+
+.modal {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  align-items: center; justify-content: center;
+  z-index: 200;
+}
+.modal.open { display: flex; }
+.modalCard {
+  background: var(--card);
+  border-radius: var(--radius);
+  width: min(700px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+.modalCard.small { width: min(420px, 92vw); }
+.modalHeader {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px; border-bottom: 1px solid #334155; font-weight: 600;
+}
+.closeBtn { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; }
+.closeBtn:hover { color: var(--text); }
+#textEditor, #clipText {
+  flex: 1;
+  min-height: 300px;
+  background: #0b1220;
+  color: var(--text);
+  border: none;
+  padding: 16px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 13px;
+  resize: vertical;
+  outline: none;
+}
+.promptInput {
+  margin: 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #0b1220;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+.modalFooter {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-top: 1px solid #334155;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--card2);
+  border: 1px solid #334155;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  opacity: 0;
+  transition: all .25s;
+  pointer-events: none;
+  z-index: 300;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.progressBar {
+  position: fixed; top: 0; left: 0; height: 3px; width: 100%;
+  background: transparent; z-index: 400; display: none;
+}
+.progressBar.active { display: block; }
+#progressFill {
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width .2s;
+}
+
+@media (max-width: 640px) {
+  .fileTable th:nth-child(3), .fileTable td:nth-child(3),
+  .fileTable th:nth-child(4), .fileTable td:nth-child(4) { display: none; }
+}

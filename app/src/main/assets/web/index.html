@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FileBridge</title>
+<link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>FileBridge</span>
+      </div>
+      <div class="deviceInfo" id="deviceInfo"></div>
+    </header>
+
+    <div class="toolbar">
+      <div class="breadcrumbs" id="breadcrumbs"></div>
+      <div class="actions">
+        <button class="btn" id="btnRefresh" title="Refresh">⟳</button>
+        <button class="btn" id="btnNewFolder" title="New folder">＋ Folder</button>
+        <label class="btn" id="btnUpload" title="Upload">
+          ⭱ Upload
+          <input type="file" id="fileInput" multiple hidden />
+        </label>
+        <button class="btn" id="btnClipboard" title="Clipboard">📋 Clipboard</button>
+      </div>
+    </div>
+
+    <div id="dropzone" class="dropzone">
+      <table class="fileTable">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Name</th>
+            <th>Size</th>
+            <th>Modified</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="fileList"></tbody>
+      </table>
+      <div id="emptyState" class="emptyState" style="display:none">This folder is empty</div>
+    </div>
+
+    <div id="dropOverlay" class="dropOverlay">Drop files to upload</div>
+  </div>
+
+  <!-- context menu -->
+  <div id="contextMenu" class="contextMenu"></div>
+
+  <!-- text viewer / editor modal -->
+  <div id="textModal" class="modal">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <span id="textModalTitle">File</span>
+        <button class="closeBtn" id="closeTextModal">✕</button>
+      </div>
+      <textarea id="textEditor" spellcheck="false"></textarea>
+      <div class="modalFooter">
+        <button class="btn" id="saveTextBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- clipboard modal -->
+  <div id="clipModal" class="modal">
+    <div class="modalCard">
+      <div class="modalHeader">
+        <span>Device Clipboard</span>
+        <button class="closeBtn" id="closeClipModal">✕</button>
+      </div>
+      <textarea id="clipText" spellcheck="false"></textarea>
+      <div class="modalFooter">
+        <button class="btn" id="clipGetBtn">Load from device</button>
+        <button class="btn" id="clipSetBtn">Send to device</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- prompt modal (rename / new folder) -->
+  <div id="promptModal" class="modal">
+    <div class="modalCard small">
+      <div class="modalHeader">
+        <span id="promptTitle">Enter a name</span>
+        <button class="closeBtn" id="closePromptModal">✕</button>
+      </div>
+      <input type="text" id="promptInput" class="promptInput" />
+      <div class="modalFooter">
+        <button class="btn" id="promptOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <div id="progressBar" class="progressBar"><div id="progressFill"></div></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

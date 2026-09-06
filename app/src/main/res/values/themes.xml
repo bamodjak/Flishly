@@ -1,0 +1,9 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.FileBridge" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/bridge_accent</item>
+        <item name="colorPrimaryDark">@color/bridge_bg</item>
+        <item name="colorAccent">@color/bridge_accent2</item>
+        <item name="android:windowBackground">@color/bridge_bg</item>
+        <item name="android:statusBarColor">@color/bridge_bg</item>
+    </style>
+</resources>
