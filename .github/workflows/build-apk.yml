@@ -1,4 +1,4 @@
-name: Build FileBridge APK
+name: Build Flishly APK
 
 on:
   push:
@@ -18,8 +18,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # No gradlew binary is committed to this repo, so we install Gradle
-      # directly instead of relying on a wrapper jar.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -31,5 +29,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: FileBridge-debug-apk
+          name: Flishly-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
