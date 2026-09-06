@@ -161,7 +161,7 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (_: Exception) {
             try { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
-            catch (_: Exception) { Toast.makeText(this, "Open Android battery settings and allow FileBridge to run in the background", Toast.LENGTH_LONG).show() }
+            catch (_: Exception) { Toast.makeText(this, "Open Android battery settings and allow Flishly to run in the background", Toast.LENGTH_LONG).show() }
         }
     }
 }
