@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.filebridge.server'
+    namespace 'com.flishly.server'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.filebridge.server"
+        applicationId "com.flishly.server"
         minSdk 24
         targetSdk 29
         versionCode 1
