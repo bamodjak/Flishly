@@ -37,7 +37,7 @@ class BridgeHttpServer(
 
     private fun unauthorizedResponse(): Response {
         val r = newFixedLengthResponse(Response.Status.UNAUTHORIZED, "text/plain", "Authentication required")
-        r.addHeader("WWW-Authenticate", "Basic realm=\"FileBridge\"")
+        r.addHeader("WWW-Authenticate", "Basic realm=\"Flishly\"")
         return r
     }
 
@@ -276,7 +276,7 @@ class BridgeHttpServer(
     private fun handleClipboardSet(session: IHTTPSession): Response {
         val text = bodyAsJson(session).optString("content", "")
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("FileBridge", text))
+        cm.setPrimaryClip(ClipData.newPlainText("Flishly", text))
         return json(JSONObject().put("ok", true))
     }
 }
