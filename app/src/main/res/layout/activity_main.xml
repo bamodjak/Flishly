@@ -14,7 +14,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="FileBridge"
+            android:text="Flishly"
             android:textColor="@color/bridge_accent"
             android:textSize="30sp"
             android:textStyle="bold"
@@ -85,11 +85,20 @@
             android:id="@+id/passwordField"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="Optional password (leave blank for none)"
+            android:hint="Set a password (applied on next start; blank = off)"
             android:textColorHint="@color/bridge_muted"
             android:textColor="@color/bridge_text"
             android:inputType="textPassword"
             android:layout_marginTop="12dp" />
+
+        <TextView
+            android:id="@+id/authStatusLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/bridge_muted"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp" />
 
         <Button
             android:id="@+id/toggleButton"
@@ -113,7 +122,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="The server uses a foreground notification and keeps the CPU available when the screen is off. For aggressive battery-saving phones, allow FileBridge to run without battery optimization."
+            android:text="The server uses a foreground notification and keeps the CPU available when the screen is off. For aggressive battery-saving phones, allow Flishly to run without battery optimization."
             android:textColor="@color/bridge_muted"
             android:textSize="12sp"
             android:layout_marginTop="12dp"

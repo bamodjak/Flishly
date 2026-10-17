@@ -36,7 +36,7 @@ To build locally, open the project in Android Studio and build the `app` module.
 
 Flishly is intended for trusted local networks. HTTP traffic is not encrypted. If password protection is enabled, credentials are sent using HTTP Basic Authentication and should not be considered secure on an untrusted network.
 
-The server restricts filesystem paths to the Android shared-storage root and rejects paths that escape that root.
+The password is stored on the device only as a salted PBKDF2 hash — never in plaintext — and survives process restarts. Repeated failed login attempts are throttled. The server restricts filesystem paths to the Android shared-storage root and rejects paths that escape that root; the storage root itself cannot be deleted, overwritten, or uploaded into. Uploads are capped in size and never silently overwrite existing files. Cross-site request protection requires requests to come from the server's own origin.
 
 ## API
 
