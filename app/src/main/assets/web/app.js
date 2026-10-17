@@ -61,6 +61,19 @@
     return {};
   }
 
+  function postOptions(body) {
+    return {
+      method: "POST",
+      credentials: "include",
+      headers: { "X-Requested-With": "flishly" },
+      body: (() => {
+        const fd = new FormData();
+        fd.append("postData", JSON.stringify(body || {}));
+        return fd;
+      })()
+    };
+  }
+
   async function apiGet(path, params) {
     const url = new URL(path, window.location.origin);
     if (params) Object.keys(params).forEach((k) => url.searchParams.set(k, params[k]));
@@ -74,15 +87,7 @@
   }
 
   async function apiPost(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      credentials: "include",
-      body: (() => {
-        const fd = new FormData();
-        fd.append("postData", JSON.stringify(body || {}));
-        return fd;
-      })()
-    });
+    const res = await fetch(path, postOptions(body));
     if (res.status === 401) { toast("Authentication required"); throw new Error("auth"); }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -93,15 +98,20 @@
 
   function renderBreadcrumbs() {
     const parts = currentPath.split("/").filter(Boolean);
-    let html = '<span data-path="/">🏠 root</span>';
+    const crumbs = [{ label: "🏠 root", path: "/" }];
     let acc = "";
     parts.forEach((p) => {
       acc += "/" + p;
-      html += ' / <span data-path="' + acc + '">' + p + "</span>";
+      crumbs.push({ label: p, path: acc });
     });
-    breadcrumbsEl.innerHTML = html;
-    breadcrumbsEl.querySelectorAll("span").forEach((s) => {
-      s.addEventListener("click", () => loadDir(s.getAttribute("data-path")));
+    breadcrumbsEl.textContent = "";
+    crumbs.forEach((c, i) => {
+      if (i > 0) breadcrumbsEl.appendChild(document.createTextNode(" / "));
+      const span = document.createElement("span");
+      span.textContent = c.label;
+      span.setAttribute("data-path", c.path);
+      span.addEventListener("click", () => loadDir(c.path));
+      breadcrumbsEl.appendChild(span);
     });
   }
 
@@ -168,8 +178,6 @@
     }
   }
 
-  // ---- context menu -------------------------------------------------------
-
   function openContextMenu(e, item) {
     contextTarget = item;
     contextMenu.innerHTML = "";
@@ -199,8 +207,6 @@
   function closeContextMenu() { contextMenu.classList.remove("open"); }
   document.addEventListener("click", (e) => { if (!e.target.closest(".contextMenu")) closeContextMenu(); });
 
-  // ---- text viewer/editor ---------------------------------------------------
-
   let currentTextPath = null;
   function openTextViewer(path) {
     apiGet("/api/read", { path }).then((data) => {
@@ -219,8 +225,6 @@
     } catch (e) { toast("Save failed: " + e.message); }
   });
 
-  // ---- clipboard ------------------------------------------------------------
-
   el("btnClipboard").addEventListener("click", () => el("clipModal").classList.add("open"));
   el("closeClipModal").addEventListener("click", () => el("clipModal").classList.remove("open"));
   el("clipGetBtn").addEventListener("click", async () => {
@@ -235,8 +239,6 @@
       toast("Sent to device clipboard");
     } catch (e) { toast("Failed: " + e.message); }
   });
-
-  // ---- prompt modal (reused for rename / new folder / move) ------------------
 
   let promptResolver = null;
   function showPrompt(title, defaultValue) {
@@ -281,8 +283,6 @@
       .catch((e) => toast("Delete failed: " + e.message));
   }
 
-  // ---- toolbar actions --------------------------------------------------------
-
   el("btnRefresh").addEventListener("click", () => loadDir(currentPath));
 
   el("btnNewFolder").addEventListener("click", async () => {
@@ -306,6 +306,7 @@
       const xhr = new XMLHttpRequest();
       await new Promise((resolve, reject) => {
         xhr.open("POST", "/api/upload?path=" + encodeURIComponent(currentPath));
+        xhr.setRequestHeader("X-Requested-With", "flishly");
         xhr.upload.onprogress = (ev) => {
           if (ev.lengthComputable) showProgress((ev.loaded / ev.total) * 100);
         };
@@ -321,7 +322,6 @@
     }
   }
 
-  // drag & drop
   const dropOverlay = el("dropOverlay");
   let dragCounter = 0;
   window.addEventListener("dragenter", (e) => { e.preventDefault(); dragCounter++; dropOverlay.classList.add("active"); });
@@ -334,13 +334,11 @@
     if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
   });
 
-  // ---- device info ------------------------------------------------------------
-
   async function loadInfo() {
     try {
       const data = await apiGet("/api/info");
       el("deviceInfo").textContent = data.brand + " " + data.model + " · Android SDK " + data.sdk;
-    } catch (e) { /* ignore */ }
+    } catch (e) { }
   }
 
   loadInfo();
