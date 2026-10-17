@@ -30,6 +30,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var passwordField: EditText
     private lateinit var networkSpinner: Spinner
     private lateinit var batteryButton: Button
+    private lateinit var authStatusLabel: TextView
+    private val authStore by lazy { AuthStore(this) }
     private var spinnerHosts: List<String> = emptyList()
     private var updatingSpinner = false
 
@@ -49,6 +51,7 @@ class MainActivity : AppCompatActivity() {
         passwordField = findViewById(R.id.passwordField)
         networkSpinner = findViewById(R.id.networkSpinner)
         batteryButton = findViewById(R.id.batteryButton)
+        authStatusLabel = findViewById(R.id.authStatusLabel)
         requestNeededPermissions()
         refreshNetworkOptions()
 
@@ -72,12 +75,14 @@ class MainActivity : AppCompatActivity() {
             if (WebServerService.isRunning) {
                 stopService(Intent(this, WebServerService::class.java))
             } else {
-                ServerConfig.password = passwordField.text.toString().trim()
+                val newPassword = passwordField.text.toString().trim()
+                if (newPassword.isEmpty()) authStore.clear() else authStore.setPassword(newPassword)
                 val host = selectedHost()
                 saveSelectedHost(host)
                 val intent = Intent(this, WebServerService::class.java)
                     .putExtra(WebServerService.EXTRA_HOST, host.ifEmpty { null })
                 if (Build.VERSION.SDK_INT >= 26) startForegroundService(intent) else startService(intent)
+                passwordField.text.clear()
             }
             refreshUi()
         }
@@ -101,6 +106,7 @@ class MainActivity : AppCompatActivity() {
         statusLabel.text = if (running) "Server running" else "Server stopped"
         toggleButton.text = if (running) "Stop Server" else "Start Server"
         urlLabel.text = if (running) "http://${selectedHost().ifEmpty { getLocalIpAddress() }}:${ServerConfig.PORT}" else ""
+        authStatusLabel.text = if (authStore.hasPassword()) "Password protection: on" else "Password protection: off — anyone on this network can access your files"
     }
 
     private fun refreshNetworkOptions() {

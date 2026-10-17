@@ -14,23 +14,61 @@ import java.io.FileInputStream
 import java.io.RandomAccessFile
 
 class BridgeHttpServer(
-    private val context: Context,
+    context: Context,
     host: String?,
     port: Int
 ) : NanoHTTPD(host, port) {
 
+    private val appContext: Context = context.applicationContext
     private val rootDir: File = Environment.getExternalStorageDirectory()
+    private val authStore = AuthStore(appContext)
+    private val rootCanonical: String = rootDir.canonicalPath
+
+    companion object {
+        const val MAX_UPLOAD_BYTES: Long = 2L * 1024 * 1024 * 1024
+        const val MAX_TEXT_BYTES: Int = 2_000_000
+        private const val MAX_FAILED_ATTEMPTS = 10
+        private const val LOCKOUT_MS: Long = 60_000
+    }
+
+    private var failedAttempts = 0
+    private var lockoutUntil = 0L
+
+    private fun isLockedOut(): Boolean = System.currentTimeMillis() < lockoutUntil
+
+    private fun recordAuthResult(success: Boolean) {
+        synchronized(this) {
+            if (success) {
+                failedAttempts = 0
+                lockoutUntil = 0
+            } else {
+                failedAttempts++
+                if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+                    lockoutUntil = System.currentTimeMillis() + LOCKOUT_MS
+                    failedAttempts = 0
+                }
+            }
+        }
+    }
 
     private fun isAuthorized(session: IHTTPSession): Boolean {
-        val pass = ServerConfig.password
-        if (pass.isEmpty()) return true
+        if (!authStore.hasPassword()) return true
+        if (isLockedOut()) return false
         val header = session.headers["authorization"] ?: return false
         if (!header.startsWith("Basic ")) return false
         return try {
             val decoded = String(Base64.decode(header.substring(6), Base64.DEFAULT))
             val parts = decoded.split(":", limit = 2)
-            parts.size == 2 && parts[1] == pass
+            if (parts.size != 2) {
+                recordAuthResult(false)
+                false
+            } else {
+                val ok = authStore.verify(parts[1])
+                recordAuthResult(ok)
+                ok
+            }
         } catch (e: Exception) {
+            recordAuthResult(false)
             false
         }
     }
@@ -41,14 +79,28 @@ class BridgeHttpServer(
         return r
     }
 
+    private fun sameOrigin(session: IHTTPSession): Boolean {
+        val host = session.headers["host"] ?: return true
+        val origin = session.headers["origin"] ?: return true
+        return try {
+            val uri = java.net.URI(origin)
+            val originAuthority = buildString {
+                append(uri.host?.lowercase() ?: return false)
+                if (uri.port > 0) append(":").append(uri.port)
+            }
+            val hostOnly = host.substringBefore(":").lowercase()
+            val hostPort = host.lowercase()
+            originAuthority == hostPort || (uri.port == -1 && originAuthority == hostOnly)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     private fun resolvePath(raw: String?): File {
         val clean = (raw ?: "/").let { if (it.isEmpty()) "/" else it }
         val target = File(rootDir, clean.removePrefix("/"))
-        val canonicalRoot = rootDir.canonicalPath
         val canonicalTarget = target.canonicalPath
-        if (canonicalTarget != canonicalRoot &&
-            !canonicalTarget.startsWith(canonicalRoot + File.separator)
-        ) {
+        if (!PathGuard.isInside(rootCanonical, canonicalTarget)) {
             throw SecurityException("Path escapes root")
         }
         return File(canonicalTarget)
@@ -56,16 +108,13 @@ class BridgeHttpServer(
 
     private fun json(obj: Any): Response {
         val r = newFixedLengthResponse(Response.Status.OK, "application/json", obj.toString())
-        r.addHeader("Access-Control-Allow-Origin", "*")
         return r
     }
 
     private fun errorJson(status: Response.Status, message: String): Response {
         val o = JSONObject()
         o.put("error", message)
-        val r = newFixedLengthResponse(status, "application/json", o.toString())
-        r.addHeader("Access-Control-Allow-Origin", "*")
-        return r
+        return newFixedLengthResponse(status, "application/json", o.toString())
     }
 
     private fun mimeFor(name: String): String {
@@ -89,13 +138,17 @@ class BridgeHttpServer(
 
         if (session.method == Method.OPTIONS) {
             val r = newFixedLengthResponse(Response.Status.OK, "text/plain", "")
-            r.addHeader("Access-Control-Allow-Origin", "*")
             r.addHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
             r.addHeader("Access-Control-Allow-Headers", "Authorization, Content-Type")
             return r
         }
 
         if (!isAuthorized(session)) return unauthorizedResponse()
+
+        val stateChanging = session.method != Method.GET
+        if (stateChanging && !sameOrigin(session)) {
+            return errorJson(Response.Status.FORBIDDEN, "Cross-origin request rejected")
+        }
 
         return try {
             when {
@@ -116,12 +169,12 @@ class BridgeHttpServer(
         } catch (e: SecurityException) {
             errorJson(Response.Status.FORBIDDEN, "Access denied")
         } catch (e: Exception) {
-            errorJson(Response.Status.INTERNAL_ERROR, e.message ?: "Server error")
+            errorJson(Response.Status.INTERNAL_ERROR, "Server error")
         }
     }
 
     private fun serveAsset(path: String, mime: String): Response {
-        val stream = context.assets.open(path)
+        val stream = appContext.assets.open(path)
         return newChunkedResponse(Response.Status.OK, mime, stream)
     }
 
@@ -176,6 +229,21 @@ class BridgeHttpServer(
         return json(result)
     }
 
+    private fun parseRange(rangeHeader: String, length: Long): Pair<Long, Long>? {
+        if (!rangeHeader.startsWith("bytes=")) return null
+        val spec = rangeHeader.substring(6).split(",").firstOrNull()?.trim() ?: return null
+        val parts = spec.split("-")
+        if (parts.isEmpty()) return null
+        val start = parts[0].toLongOrNull() ?: return null
+        val end = if (parts.size > 1 && parts[1].isNotEmpty()) {
+            parts[1].toLongOrNull() ?: return null
+        } else {
+            length - 1
+        }
+        if (start < 0 || end < start || start >= length) return null
+        return Pair(start, minOf(end, length - 1))
+    }
+
     private fun handleDownload(session: IHTTPSession): Response {
         val path = session.parameters["path"]?.firstOrNull() ?: return errorJson(Response.Status.BAD_REQUEST, "path required")
         val target = resolvePath(path)
@@ -183,10 +251,11 @@ class BridgeHttpServer(
         val rangeHeader = session.headers["range"]
         val length = target.length()
         val mime = mimeFor(target.name)
-        if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
-            val parts = rangeHeader.substring(6).split("-")
-            val start = parts[0].toLongOrNull() ?: 0
-            val end = if (parts.size > 1 && parts[1].isNotEmpty()) parts[1].toLong() else length - 1
+        val safeName = target.name.replace("\"", "_")
+        if (rangeHeader != null) {
+            val range = parseRange(rangeHeader, length)
+                ?: return errorJson(Response.Status.RANGE_NOT_SATISFIABLE, "Invalid range")
+            val (start, end) = range
             val chunkLen = end - start + 1
             val raf = RandomAccessFile(target, "r")
             raf.seek(start)
@@ -194,12 +263,12 @@ class BridgeHttpServer(
             val r = newFixedLengthResponse(Response.Status.PARTIAL_CONTENT, mime, stream, chunkLen)
             r.addHeader("Content-Range", "bytes $start-$end/$length")
             r.addHeader("Accept-Ranges", "bytes")
-            r.addHeader("Content-Disposition", "inline; filename=\"${target.name}\"")
+            r.addHeader("Content-Disposition", "inline; filename=\"$safeName\"")
             return r
         }
         val stream = FileInputStream(target)
         val r = newFixedLengthResponse(Response.Status.OK, mime, stream, length)
-        r.addHeader("Content-Disposition", "attachment; filename=\"${target.name}\"")
+        r.addHeader("Content-Disposition", "attachment; filename=\"$safeName\"")
         r.addHeader("Accept-Ranges", "bytes")
         return r
     }
@@ -208,34 +277,67 @@ class BridgeHttpServer(
         val path = session.parameters["path"]?.firstOrNull() ?: return errorJson(Response.Status.BAD_REQUEST, "path required")
         val target = resolvePath(path)
         if (!target.exists() || target.isDirectory) return errorJson(Response.Status.NOT_FOUND, "File not found")
-        if (target.length() > 2_000_000) return errorJson(Response.Status.BAD_REQUEST, "File too large to view as text")
+        if (target.length() > MAX_TEXT_BYTES) return errorJson(Response.Status.BAD_REQUEST, "File too large to view as text")
         return json(JSONObject().put("content", target.readText()))
+    }
+
+    private fun resolveWritableDir(raw: String?): File {
+        val target = resolvePath(raw)
+        if (PathGuard.isRoot(rootCanonical, target.canonicalPath)) {
+            throw SecurityException("Operation not permitted at storage root")
+        }
+        return target
     }
 
     private fun handleWriteText(session: IHTTPSession): Response {
         val body = bodyAsJson(session)
-        resolvePath(body.getString("path")).writeText(body.optString("content", ""))
+        val target = resolveWritableDir(body.getString("path"))
+        target.writeText(body.optString("content", ""))
         return json(JSONObject().put("ok", true))
     }
 
     private fun handleUpload(session: IHTTPSession): Response {
         val dirPath = session.parameters["path"]?.firstOrNull() ?: "/"
-        val targetDir = resolvePath(dirPath)
+        val targetDir = resolveWritableDir(dirPath)
         if (!targetDir.exists()) targetDir.mkdirs()
         val files = HashMap<String, String>()
         session.parseBody(files)
+        val stat = StatFs(targetDir.path)
+        val freeBytes = stat.availableBytes
+        var totalIncoming = 0L
         val uploadedNames = JSONArray()
         for ((fieldName, tmpPath) in files) {
-            val originalName = session.parameters[fieldName]?.firstOrNull() ?: File(tmpPath).name
-            val safeName = File(originalName).name
-            File(tmpPath).copyTo(File(targetDir, safeName), overwrite = true)
-            uploadedNames.put(safeName)
+            if (fieldName == "postData") continue
+            val tmp = File(tmpPath)
+            val originalName = session.parameters[fieldName]?.firstOrNull() ?: tmp.name
+            val safeName = PathGuard.safeFileName(originalName)
+                ?: return errorJson(Response.Status.BAD_REQUEST, "Unsafe file name")
+            totalIncoming += tmp.length()
+            if (totalIncoming > MAX_UPLOAD_BYTES || totalIncoming > freeBytes) {
+                tmp.delete()
+                return errorJson(Response.Status.PAYLOAD_TOO_LARGE, "Upload exceeds size or free-space limit")
+            }
+            val dest = File(targetDir, safeName)
+            if (dest.exists()) {
+                val base = dest.nameWithoutExtension
+                val ext = dest.extension
+                var candidate = File(targetDir, "$base (1).$ext")
+                var n = 1
+                while (candidate.exists() && n < 1000) {
+                    n++
+                    candidate = File(targetDir, "$base ($n).$ext")
+                }
+                tmp.copyTo(candidate, overwrite = false)
+            } else {
+                tmp.copyTo(dest, overwrite = false)
+            }
+            uploadedNames.put(dest.name)
         }
         return json(JSONObject().put("ok", true).put("uploaded", uploadedNames))
     }
 
     private fun handleMkdir(session: IHTTPSession): Response {
-        val target = resolvePath(bodyAsJson(session).getString("path"))
+        val target = resolveWritableDir(bodyAsJson(session).getString("path"))
         return json(JSONObject().put("ok", target.exists() || target.mkdirs()))
     }
 
@@ -246,17 +348,23 @@ class BridgeHttpServer(
 
     private fun handleDelete(session: IHTTPSession): Response {
         val paths = bodyAsJson(session).getJSONArray("paths")
-        for (i in 0 until paths.length()) deleteRecursively(resolvePath(paths.getString(i)))
+        for (i in 0 until paths.length()) {
+            deleteRecursively(resolveWritableDir(paths.getString(i)))
+        }
         return json(JSONObject().put("ok", true))
     }
 
     private fun handleMove(session: IHTTPSession): Response {
         val body = bodyAsJson(session)
-        val src = resolvePath(body.getString("src"))
-        val dst = resolvePath(body.getString("dst"))
-        dst.parentFile?.mkdirs()
+        val src = resolveWritableDir(body.getString("src"))
+        val dstParent = resolveWritableDir(File(body.getString("dst")).parent ?: "/")
+        val dstName = PathGuard.safeFileName(File(body.getString("dst")).name)
+            ?: return errorJson(Response.Status.BAD_REQUEST, "Unsafe destination name")
+        val dst = File(dstParent, dstName)
+        if (src == dst) return errorJson(Response.Status.BAD_REQUEST, "Source and destination are the same")
+        if (dst.exists()) return errorJson(Response.Status.CONFLICT, "Destination already exists")
         if (!src.renameTo(dst)) {
-            src.copyTo(dst, overwrite = true)
+            src.copyTo(dst, overwrite = false)
             deleteRecursively(src)
         }
         return json(JSONObject().put("ok", true))
@@ -264,20 +372,23 @@ class BridgeHttpServer(
 
     private fun handleRename(session: IHTTPSession): Response {
         val body = bodyAsJson(session)
-        val src = resolvePath(body.getString("path"))
-        val dst = File(src.parentFile, File(body.getString("newName")).name)
+        val src = resolveWritableDir(body.getString("path"))
+        val newName = PathGuard.safeFileName(body.getString("newName"))
+            ?: return errorJson(Response.Status.BAD_REQUEST, "Unsafe name")
+        val dst = File(src.parentFile, newName)
+        if (dst.exists()) return errorJson(Response.Status.CONFLICT, "Name already in use")
         return json(JSONObject().put("ok", src.renameTo(dst)))
     }
 
     private fun handleClipboardGet(): Response {
-        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = if (cm.hasPrimaryClip() && cm.primaryClip!!.itemCount > 0) cm.primaryClip!!.getItemAt(0).coerceToText(context).toString() else ""
+        val cm = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = if (cm.hasPrimaryClip() && cm.primaryClip!!.itemCount > 0) cm.primaryClip!!.getItemAt(0).coerceToText(appContext).toString() else ""
         return json(JSONObject().put("content", text))
     }
 
     private fun handleClipboardSet(session: IHTTPSession): Response {
         val text = bodyAsJson(session).optString("content", "")
-        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val cm = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText("Flishly", text))
         return json(JSONObject().put("ok", true))
     }
