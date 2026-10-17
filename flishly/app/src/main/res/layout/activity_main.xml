@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bridge_bg"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="20dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Flishly"
+                    android:textColor="@color/bridge_accent"
+                    android:textSize="30sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Browser-based file access — no app needed on the other side"
+                    android:textColor="@color/bridge_muted"
+                    android:textSize="14sp"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+
+            <ImageButton
+                android:id="@+id/settingsButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Settings"
+                android:src="@android:drawable/ic_menu_preferences"
+                app:tint="@color/bridge_muted" />
+        </LinearLayout>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:cardBackgroundColor="@color/bridge_card"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <View
+                        android:id="@+id/statusDot"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/status_dot" />
+                    <TextView
+                        android:id="@+id/statusLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Server stopped"
+                        android:textColor="@color/bridge_muted"
+                        android:textSize="14sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/urlLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="@color/bridge_text"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:textIsSelectable="true"
+                    android:layout_marginTop="8dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Open this address in a browser on a device on the same network"
+                    android:textColor="@color/bridge_muted"
+                    android:textSize="12sp"
+                    android:layout_marginTop="4dp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Network address"
+            android:textColor="@color/bridge_muted"
+            android:textSize="12sp"
+            android:layout_marginTop="18dp" />
+
+        <AutoCompleteTextView
+            android:id="@+id/networkSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:inputType="none"
+            android:background="@android:color/transparent"
+            android:textColor="@color/bridge_text"
+            android:completionThreshold="0"
+            android:layout_marginTop="4dp" />
+
+        <EditText
+            android:id="@+id/passwordField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Set a password (applied on next start; blank = off)"
+            android:textColorHint="@color/bridge_muted"
+            android:textColor="@color/bridge_text"
+            android:inputType="textPassword"
+            android:layout_marginTop="12dp" />
+
+        <TextView
+            android:id="@+id/authStatusLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="@color/bridge_muted"
+            android:textSize="12sp"
+            android:layout_marginTop="4dp" />
+
+        <Button
+            android:id="@+id/toggleButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="16dp"
+            android:text="Start Server"
+            android:textAllCaps="false"
+            android:textStyle="bold"
+            android:backgroundTint="@color/bridge_accent"
+            android:textColor="@color/bridge_bg" />
+
+        <Button
+            android:id="@+id/batteryButton"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="10dp"
+            android:text="Allow background running"
+            android:textAllCaps="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="The server uses a foreground notification and keeps the CPU and Wi-Fi awake when the screen is off. For aggressive battery-saving phones, allow Flishly to run without battery optimization."
+            android:textColor="@color/bridge_muted"
+            android:textSize="12sp"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="20dp" />
+    </LinearLayout>
+</ScrollView>
